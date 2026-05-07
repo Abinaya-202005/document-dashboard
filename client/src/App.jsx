@@ -1,23 +1,53 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:5000");
 
 function App() {
 
   const [files, setFiles] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
+
     fetchDocuments();
+    fetchNotifications();
+
+    socket.on("new_notification", (data) => {
+      setNotifications((prev) => [data, ...prev]);
+    });
+
   }, []);
 
   const fetchDocuments = async () => {
-    const res = await axios.get("http://localhost:5000/documents");
+
+    const res = await axios.get(
+      "http://localhost:5000/documents"
+    );
+
     setDocuments(res.data);
+
+  };
+
+  const fetchNotifications = async () => {
+
+    const res = await axios.get(
+      "http://localhost:5000/notifications"
+    );
+
+    setNotifications(res.data);
+
   };
 
   const handleUpload = async (e) => {
 
     const selectedFiles = Array.from(e.target.files);
+
+    if (selectedFiles.length > 3) {
+      alert("Processing files in background...");
+    }
 
     setFiles(
       selectedFiles.map((file) => ({
@@ -32,27 +62,37 @@ function App() {
       formData.append("files", file);
     });
 
-    await axios.post("http://localhost:5000/upload", formData, {
+    await axios.post(
+      "http://localhost:5000/upload",
+      formData,
+      {
 
-      onUploadProgress: (progressEvent) => {
+        onUploadProgress: (progressEvent) => {
 
-        const percent = Math.round(
-          (progressEvent.loaded * 100) / progressEvent.total
-        );
+          const percent = Math.round(
+            (progressEvent.loaded * 100) /
+              progressEvent.total
+          );
 
-        setFiles((prev) =>
-          prev.map((file) => ({
-            ...file,
-            progress: percent,
-          }))
-        );
-      },
-    });
+          setFiles((prev) =>
+            prev.map((file) => ({
+              ...file,
+              progress: percent,
+            }))
+          );
+
+        },
+
+      }
+    );
 
     fetchDocuments();
+    fetchNotifications();
+
   };
 
   return (
+
     <div className="min-h-screen bg-[#f5f7fb] p-10">
 
       <div className="max-w-5xl mx-auto">
@@ -63,8 +103,16 @@ function App() {
             Document Dashboard
           </h1>
 
-          <button className="bg-blue-600 text-white px-5 py-2 rounded-xl">
+          <button className="bg-blue-600 text-white px-5 py-2 rounded-xl relative">
+
             Notifications
+
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 rounded-full">
+
+              {notifications.length}
+
+            </span>
+
           </button>
 
         </div>
@@ -98,15 +146,20 @@ function App() {
               <div key={index}>
 
                 <div className="flex justify-between mb-1">
+
                   <span>{file.name}</span>
+
                   <span>{file.progress}%</span>
+
                 </div>
 
                 <div className="w-full bg-gray-200 rounded-full h-3">
 
                   <div
                     className="bg-blue-600 h-3 rounded-full transition-all"
-                    style={{ width: `${file.progress}%` }}
+                    style={{
+                      width: `${file.progress}%`,
+                    }}
                   />
 
                 </div>
@@ -131,8 +184,13 @@ function App() {
 
               <tr className="border-b">
 
-                <th className="text-left py-3">File Name</th>
-                <th className="text-left py-3">Size</th>
+                <th className="text-left py-3">
+                  File Name
+                </th>
+
+                <th className="text-left py-3">
+                  Size
+                </th>
 
               </tr>
 
@@ -144,10 +202,14 @@ function App() {
 
                 <tr key={index} className="border-b">
 
-                  <td className="py-3">{doc.name}</td>
+                  <td className="py-3">
+                    {doc.name}
+                  </td>
 
                   <td className="py-3">
+
                     {(doc.size / 1024).toFixed(2)} KB
+
                   </td>
 
                 </tr>
@@ -160,10 +222,49 @@ function App() {
 
         </div>
 
+        <div className="bg-white rounded-2xl p-10 shadow-sm border mt-10">
+
+          <h2 className="text-2xl font-semibold mb-6">
+            Notifications
+          </h2>
+
+          <div className="space-y-4">
+
+            {notifications.length === 0 ? (
+
+              <p className="text-gray-500">
+                No notifications yet
+              </p>
+
+            ) : (
+
+              notifications.map((notification) => (
+
+                <div
+                  key={notification.id}
+                  className="border rounded-xl p-4"
+                >
+
+                  <p>
+                    {notification.message}
+                  </p>
+
+                </div>
+
+              ))
+
+            )}
+
+          </div>
+
+        </div>
+
       </div>
 
     </div>
+
   );
+
 }
 
 export default App;
